@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Videy - Upload Video</title>
+    <!-- (CSS sama seperti sebelumnya, bisa Anda kustomisasi) -->
+    <style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center}.upload-btn-main,.progress-bar{background:#007bff;color:#fff;border:none;border-radius:20px;padding:12px 24px;font-size:16px;cursor:pointer;min-width:180px;transition:background-color .2s}.upload-btn-main:hover{background:#0056b3}.progress-bar{background:#6c757d;cursor:default}#errorMsg{color:#dc3545;margin-top:15px;font-weight:700}#successLink{margin-top:20px;font-size:16px;word-break:break-all}#successLink a{color:#28a745;text-decoration:none;font-weight:700}</style>
+</head>
+<body>
+    <h1>Upload Your Video</h1>
+    <p>Get a custom, shareable link instantly.</p>
+    <nav style="margin-bottom: 20px;">
+        <a href="./index.html">Uploader</a> | 
+        <a href="./shortener.html">URL Rotator</a>
+    </nav>
+    <form id="uploadForm">
+        <input type="file" id="fileInput" accept="video/*" style="display:none;">
+        <button type="button" class="upload-btn-main" id="uploadBtn">Choose Video</button>
+    </form>
+    <div id="errorMsg"></div>
+    <div id="successLink"></div>
+
+    <script>
+        // --- KONFIGURASI ANDA ---
+        const CLOUDINARY_CLOUD_NAME = "dkvow8ixo";
+        const CLOUDINARY_UPLOAD_PRESET = "yc6ubuls"; // PENTING: Buat ini di Cloudinary Settings > Upload
+        const VERCEL_BACKEND_URL = "https://videy-final-backend.vercel.app";
+        // ------------------------
+
+        const uploadBtn = document.getElementById('uploadBtn');
+        const fileInput = document.getElementById('fileInput');
+        const errorMsg = document.getElementById('errorMsg');
+        const successLinkDiv = document.getElementById('successLink');
+
+        uploadBtn.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', async function() {
+            if (this.files.length === 0) return;
+            const file = this.files[0];
+            const progressBar = document.createElement('div');
+            progressBar.className = 'progress-bar';
+            uploadBtn.replaceWith(progressBar);
+            errorMsg.textContent = '';
+            successLinkDiv.innerHTML = '';
+            
+            try {
+                // 1. Upload ke Cloudinary (Unsigned)
+                progressBar.textContent = '1/2: Uploading...';
+                const cloudinaryUrl = await uploadToCloudinary(file, progressBar);
+
+                // 2. Simpan link ke backend kita
+                progressBar.textContent = '2/2: Creating link...';
+                const response = await fetch(`${VERCEL_BACKEND_URL}/api/save-link`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ destinationUrl: cloudinaryUrl, type: 'video' })
+                });
+                if (!response.ok) throw new Error('Failed to create custom link.');
+                
+                const data = await response.json();
+                const finalUrl = `./v.html?id=${data.id}`;
+                
+                progressBar.style.backgroundColor = '#28a745';
+                progressBar.textContent = 'Success!';
+                successLinkDiv.innerHTML = `Your Link: <a href="${finalUrl}" target="_blank">${finalUrl}</a>`;
+                setTimeout(() => { window.location.href = finalUrl; }, 2000);
+
+            } catch (error) {
+                errorMsg.textContent = error.message;
+                progressBar.replaceWith(uploadBtn);
+            }
+        });
+
+        function uploadToCloudinary(file, progressBar) {
+            return new Promise((resolve, reject) => {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+                
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`);
+                
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        progressBar.textContent = `1/2: Uploading... ${percent}%`;
+                    }
+                };
+
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
+                        resolve(JSON.parse(xhr.responseText).secure_url);
+                    } else {
+                        reject(new Error('Cloudinary upload failed.'));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('Network error during upload.'));
+                xhr.send(formData);
+            });
+        }
+    </script>
+</body>
+</html>
