@@ -29,7 +29,6 @@
     </div>
     <script>
         const VERCEL_BACKEND_URL = "https://videy-final-backend.vercel.app";
-        const GITHUB_PAGES_BASE_URL = "https://adithikmah28.github.io/videy-final-frontend"; // Ganti 'videy-final-frontend' jika nama repo beda
 
         document.getElementById('generateBtn').addEventListener('click', async function() {
             const button = this;
@@ -57,7 +56,9 @@
                 }
 
                 const data = await response.json();
-                const fullUrls = data.ids.map(id => `${GITHUB_PAGES_BASE_URL}/v.html?id=${id}`);
+                const fullUrls = data.ids.map(id => {
+                const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+                return `${window.location.origin}${basePath}/v.html?id=${id}`;
                 outputLinks.value = fullUrls.join('\n');
 
             } catch (error) {
